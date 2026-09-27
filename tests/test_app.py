@@ -51,6 +51,10 @@ class AppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"comparisons": []})
 
+        animals_response = self.client.get("/api/popular-animals")
+        self.assertEqual(animals_response.status_code, 200)
+        self.assertEqual(animals_response.json, {"animals": []})
+
     def test_invalid_inputs_do_not_create_events(self):
         for url in ("/api/compare", "/api/compare?first=dog&second=unknown", "/api/compare?first=dog&second=dog"):
             with self.subTest(url=url):
@@ -78,6 +82,14 @@ class AppTests(unittest.TestCase):
                 "second": {"id": "dog", "name": "Domestic Dog"},
                 "count": 1,
             }],
+        )
+        animals_response = self.client.get("/api/popular-animals")
+        self.assertEqual(
+            animals_response.json["animals"],
+            [
+                {"animal": {"id": "cat", "name": "Domestic Cat"}, "count": 1},
+                {"animal": {"id": "dog", "name": "Domestic Dog"}, "count": 1},
+            ],
         )
 
     @patch("app.get_taxon", return_value=TAXON)

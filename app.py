@@ -86,6 +86,7 @@ INAT_AUTOCOMPLETE_URL = "https://api.inaturalist.org/v1/taxa/autocomplete"
 CACHE_SECONDS = 6 * 60 * 60
 MAX_SEARCH_RESULTS = 12
 MAX_POPULAR_COMPARISONS = 8
+MAX_POPULAR_ANIMALS = 8
 DEFAULT_DATABASE_PATH = Path(__file__).with_name("animal_vs.db")
 
 app.config["DATABASE_PATH"] = os.environ.get("ANIMAL_VS_DATABASE", str(DEFAULT_DATABASE_PATH))
@@ -184,6 +185,32 @@ def get_popular_comparisons(limit: int) -> list[dict]:
     ]
 
 
+def get_popular_animals(limit: int) -> list[dict]:
+    """Return the animals that appear most often in completed comparisons."""
+    connection = get_database_connection()
+    try:
+        rows = connection.execute(
+            """
+            SELECT animal_id,
+                   COALESCE(animal_name, 'Animal #' || animal_id) AS animal_name,
+                   COUNT(*) AS count
+            FROM (
+                SELECT first_id AS animal_id, first_name AS animal_name FROM comparison_events
+                UNION ALL
+                SELECT second_id AS animal_id, second_name AS animal_name FROM comparison_events
+            )
+            GROUP BY animal_id, animal_name
+            ORDER BY count DESC, animal_name ASC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    finally:
+        connection.close()
+
+    return [{"animal": {"id": row["animal_id"], "name": row["animal_name"]}, "count": row["count"]} for row in rows]
+
+
 def request_inaturalist(url: str) -> dict:
     """Fetch JSON from iNaturalist using the application's user agent."""
     api_request = Request(url, headers={"User-Agent": "AnimalVS-CMU-course-project/1.0"})
@@ -278,6 +305,24 @@ def popular_comparisons():
     except sqlite3.Error as exc:
         app.logger.exception("Could not load popular comparisons: %s", exc)
         return jsonify({"error": "Could not load popular comparisons."}), 500
+
+
+@app.get("/api/popular-animals")
+def popular_animals():
+    """Return the individual animals that appear most often in comparisons."""
+    requested_limit = request.args.get("limit", "5")
+    try:
+        limit = int(requested_limit)
+    except ValueError:
+        return jsonify({"error": "The limit must be a whole number."}), 400
+    if not 1 <= limit <= MAX_POPULAR_ANIMALS:
+        return jsonify({"error": f"The limit must be between 1 and {MAX_POPULAR_ANIMALS}."}), 400
+
+    try:
+        return jsonify({"animals": get_popular_animals(limit)})
+    except sqlite3.Error as exc:
+        app.logger.exception("Could not load popular animals: %s", exc)
+        return jsonify({"error": "Could not load popular animals."}), 500
 
 
 @app.get("/api/compare")

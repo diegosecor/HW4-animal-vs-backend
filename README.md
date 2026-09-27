@@ -36,12 +36,19 @@ Returns the most frequently completed matchups.
 - **Response:** `{"comparisons": [{"first": {...}, "second": {...}, "count": 3}]}`
 - **Counting rule:** matchups are direction-independent, so Dog vs Cat and Cat vs Dog count together.
 
+### `GET /api/popular-animals?limit=5`
+Returns the individual animals that appear most often in completed comparisons.
+
+- **Parameters:** optional `limit` from 1 through 8; default is 5.
+- **Response:** `{"animals": [{"animal": {"id": "dog", "name": "Domestic Dog"}, "count": 3}]}`
+
 ## Frontend Communication
 
 1. As a visitor types, the frontend requests `/api/animals/search?q=...`.
 2. It renders matching mass-reference animals in a custom autocomplete menu.
 3. When two entries are selected, it calls `/api/compare` using their catalog IDs.
 4. It displays the mass equivalence and iNaturalist species cards, then refreshes the popular-matchup ranking.
+5. It refreshes the top-five individual animal ranking after each completed comparison.
 
 ## Running Locally
 
